@@ -244,7 +244,7 @@ class BUNDLE(Target):
                             break
                         except FileExistsError:
                             pass
-                    if not os.path.exists(os.path.join(bin_dir, inm)):
+                    if not os.path.exists(os.path.join(bin_dir, inm)) and not os.path.exists(os.path.join(frame_dir, os.path.split(inm)[-1])):
                         relative_source_path = os.path.relpath(
                             os.path.join(res_dir, inm),
                             os.path.split(os.path.join(bin_dir, inm))[0]
