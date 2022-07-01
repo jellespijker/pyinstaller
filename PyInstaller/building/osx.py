@@ -172,7 +172,7 @@ class BUNDLE(Target):
             plistlib.dump(info_plist_dict, plist_fh)
 
         links = []
-        _QT_BASE_PATH = {'PySide2', 'PySide6', 'PyQt5', 'PySide6'}
+        _QT_BASE_PATH = {'PySide2', 'PySide6', 'PyQt5', 'PyQt6', 'PySide6'}
         for inm, fnm, typ in self.toc:
             # Adjust name for extensions, if applicable
             inm, fnm, typ = add_suffix_to_extension(inm, fnm, typ)
