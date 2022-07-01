@@ -192,8 +192,8 @@ class BUNDLE(Target):
                     strict_arch_validation=(typ == 'EXTENSION'),
                 )
             # Add most data files to a list for symlinking later.
-            if typ == 'DATA' and base_path not in _QT_BASE_PATH:
-                links.append((inm, fnm))
+            if typ in ('DATA', 'BINARY') and base_path not in _QT_BASE_PATH:
+                links.append((inm, fnm, typ))
             else:
                 tofnm = os.path.join(self.name, "Contents", "MacOS", inm)
                 todir = os.path.dirname(tofnm)
@@ -212,8 +212,12 @@ class BUNDLE(Target):
         # Put all data files in ./Resources and create symlinks in ./MacOS.
         bin_dir = os.path.join(self.name, 'Contents', 'MacOS')
         res_dir = os.path.join(self.name, 'Contents', 'Resources')
-        for inm, fnm in links:
-            tofnm = os.path.join(res_dir, inm)
+        frame_dir = os.path.join(self.name, 'Contents', 'Frameworks')
+        for inm, fnm, typ in links:
+            if typ == 'BINARY':
+                tofnm = os.path.join(frame_dir, os.path.split(inm)[-1])
+            else:
+                tofnm = os.path.join(res_dir, inm)
             todir = os.path.dirname(tofnm)
             if not os.path.exists(todir):
                 os.makedirs(todir)
