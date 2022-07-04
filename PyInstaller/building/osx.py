@@ -252,10 +252,16 @@ class BUNDLE(Target):
                         dest_path = os.path.join(bin_dir, inm)
                         os.symlink(relative_source_path, dest_path)
             else:  # If path is empty, e.g., a top-level file, try to just symlink the file.
-                os.symlink(
-                    os.path.relpath(os.path.join(res_dir, inm),
-                                    os.path.split(os.path.join(bin_dir, inm))[0]), os.path.join(bin_dir, inm)
-                )
+                if typ == 'BINARY':
+                    os.symlink(
+                        os.path.relpath(os.path.join(frame_dir, inm),
+                                        os.path.split(os.path.join(bin_dir, inm))[0]), os.path.join(bin_dir, inm)
+                    )
+                else:
+                    os.symlink(
+                        os.path.relpath(os.path.join(res_dir, inm),
+                                        os.path.split(os.path.join(bin_dir, inm))[0]), os.path.join(bin_dir, inm)
+                    )
 
         # Sign the bundle
         logger.info('Signing the BUNDLE...')
