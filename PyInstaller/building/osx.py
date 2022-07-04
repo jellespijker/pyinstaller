@@ -192,7 +192,7 @@ class BUNDLE(Target):
                     strict_arch_validation=(typ == 'EXTENSION'),
                 )
             # Add most data files to a list for symlinking later.
-            if typ in ('DATA', 'BINARY') and base_path not in _QT_BASE_PATH:
+            if (typ == 'DATA' and base_path not in _QT_BASE_PATH) or typ == 'BINARY':
                 links.append((inm, fnm, typ))
             else:
                 tofnm = os.path.join(self.name, "Contents", "MacOS", inm)
