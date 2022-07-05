@@ -212,7 +212,11 @@ class BUNDLE(Target):
                         os.makedirs(macos_dst, exist_ok=True)
                     else:
                         os.makedirs(macos_dst.parent, exist_ok=True)
-                    macos_dst.symlink_to(frame_dst)
+                    symlink_to = Path(*[".." for p in macos_dst.relative_to(macos_path).parts], "Frameworks").joinpath(frame_dst.relative_to(frameworks_path))
+                    try:
+                        macos_dst.symlink_to(symlink_to)
+                    except FileExistsError:
+                        pass
             else:
                 if typ == 'DATA':
                     if any(['.' in p for p in inm_.parent.parts]) or inm_.suffix == '.so':
@@ -231,7 +235,11 @@ class BUNDLE(Target):
                             os.makedirs(macos_dst, exist_ok=True)
                         else:
                             os.makedirs(macos_dst.parent, exist_ok=True)
-                        macos_dst.symlink_to(res_dst)
+                        symlink_to = Path(*[".." for p in macos_dst.relative_to(macos_path).parts], "Resources").joinpath(res_dst.relative_to(resources_path))
+                        try:
+                            macos_dst.symlink_to(symlink_to)
+                        except FileExistsError:
+                            pass
                 else:
                     macos_dst = macos_path.joinpath(inm_)
                     if not macos_dst.exists():
