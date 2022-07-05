@@ -185,7 +185,7 @@ class BUNDLE(Target):
             fnm = Path(fnm)
             # Copy files from cache. This ensures that are used files with relative paths to dynamic library
             # dependencies (@executable_path)
-            if typ in ('EXTENSION', 'BINARY'):
+            if typ in ('EXTENSION', 'BINARY') or (typ == 'DATA' and inm_.suffix == '.so'):
                 if any(['.' in p for p in inm_.parent.parts]):
                     inm_ = Path(inm_.name)
                 fnm = Path(checkCache(
@@ -215,7 +215,7 @@ class BUNDLE(Target):
                     macos_dst.symlink_to(frame_dst)
             else:
                 if typ == 'DATA':
-                    if any(['.' in p for p in inm_.parent.parts]):
+                    if any(['.' in p for p in inm_.parent.parts]) or inm_.suffix == '.so':
                         # Skip info dist egg and some not needed folders in tcl and tk, since they all contain dots in their files
                         continue
                     res_dst = resources_path.joinpath(inm_)
