@@ -13,6 +13,8 @@ import os
 import plistlib
 import shutil
 
+from pathlib import Path
+
 from PyInstaller.building.api import COLLECT, EXE
 from PyInstaller.building.datastruct import TOC, Target, logger
 from PyInstaller.building.utils import (_check_path_overlap, _rmtree, add_suffix_to_extension, checkCache)
@@ -120,9 +122,12 @@ class BUNDLE(Target):
         logger.info("Building BUNDLE %s", self.tocbasename)
 
         # Create a minimal Mac bundle structure.
-        os.makedirs(os.path.join(self.name, "Contents", "MacOS"))
-        os.makedirs(os.path.join(self.name, "Contents", "Resources"))
-        os.makedirs(os.path.join(self.name, "Contents", "Frameworks"))
+        macos_path = Path(self.name, "Contents", "MacOS")
+        resources_path = Path(self.name, "Contents", "Resources")
+        frameworks_path = Path(self.name, "Contents", "Frameworks")
+        os.makedirs(macos_path)
+        os.makedirs(resources_path)
+        os.makedirs(frameworks_path)
 
         # Makes sure the icon exists and attempts to convert to the proper format if applicable
         self.icon = normalize_icon_type(self.icon, ("icns",), "icns", CONF["workpath"])
@@ -176,92 +181,66 @@ class BUNDLE(Target):
         for inm, fnm, typ in self.toc:
             # Adjust name for extensions, if applicable
             inm, fnm, typ = add_suffix_to_extension(inm, fnm, typ)
+            inm_ = Path(inm)
+            fnm = Path(fnm)
             # Copy files from cache. This ensures that are used files with relative paths to dynamic library
             # dependencies (@executable_path)
-            base_path = inm.split('/', 1)[0]
             if typ in ('EXTENSION', 'BINARY'):
-                fnm = checkCache(
-                    fnm,
+                if any(['.' in p for p in inm_.parent.parts]):
+                    inm_ = Path(inm_.name)
+                fnm = Path(checkCache(
+                    str(fnm),
                     strip=self.strip,
                     upx=self.upx,
                     upx_exclude=self.upx_exclude,
-                    dist_nm=inm,
+                    dist_nm=str(inm_),
                     target_arch=self.target_arch,
                     codesign_identity=self.codesign_identity,
                     entitlements_file=self.entitlements_file,
                     strict_arch_validation=(typ == 'EXTENSION'),
-                )
-            # Add most data files to a list for symlinking later.
-            if typ in ('DATA', 'BINARY') and base_path not in _QT_BASE_PATH:
-                links.append((inm, fnm, typ))
+                ))
+                frame_dst = frameworks_path.joinpath(inm_)
+                if not frame_dst.exists():
+                    if frame_dst.is_dir():
+                        os.makedirs(frame_dst, exist_ok=True)
+                    else:
+                        os.makedirs(frame_dst.parent, exist_ok=True)
+                shutil.copy(fnm, frame_dst, follow_symlinks=True)
+                macos_dst = macos_path.joinpath(inm_)
+                if not macos_dst.exists():
+                    if macos_dst.is_dir():
+                        os.makedirs(macos_dst, exist_ok=True)
+                    else:
+                        os.makedirs(macos_dst.parent, exist_ok=True)
+                    macos_dst.symlink_to(frame_dst)
             else:
-                tofnm = os.path.join(self.name, "Contents", "MacOS", inm)
-                todir = os.path.dirname(tofnm)
-                if not os.path.exists(todir):
-                    os.makedirs(todir)
-                if os.path.isdir(fnm):
-                    # Because shutil.copy2() is the default copy function for shutil.copytree, this will also copy file
-                    # metadata.
-                    shutil.copytree(fnm, tofnm)
+                if typ == 'DATA':
+                    if any(['.' in p for p in inm_.parent.parts]):
+                        # Skip info dist egg and some not needed folders in tcl and tk, since they all contain dots in their files
+                        continue
+                    res_dst = resources_path.joinpath(inm_)
+                    if not res_dst.exists():
+                        if res_dst.is_dir():
+                            os.makedirs(res_dst, exist_ok=True)
+                        else:
+                            os.makedirs(res_dst.parent, exist_ok=True)
+                    shutil.copy(fnm, res_dst, follow_symlinks=True)
+                    macos_dst = macos_path.joinpath(inm_)
+                    if not macos_dst.exists():
+                        if macos_dst.is_dir():
+                            os.makedirs(macos_dst, exist_ok=True)
+                        else:
+                            os.makedirs(macos_dst.parent, exist_ok=True)
+                        macos_dst.symlink_to(res_dst)
                 else:
-                    shutil.copy(fnm, tofnm)
+                    macos_dst = macos_path.joinpath(inm_)
+                    if not macos_dst.exists():
+                        if macos_dst.is_dir():
+                            os.makedirs(macos_dst, exist_ok=True)
+                        else:
+                            os.makedirs(macos_dst.parent, exist_ok=True)
+                        shutil.copy(fnm, macos_dst, follow_symlinks=True)
 
-        logger.info('Moving BUNDLE data files to Resource directory')
-
-        # Mac OS Code Signing does not work when .app bundle contains data files in dir ./Contents/MacOS.
-        # Put all data files in ./Resources and create symlinks in ./MacOS.
-        bin_dir = os.path.join(self.name, 'Contents', 'MacOS')
-        res_dir = os.path.join(self.name, 'Contents', 'Resources')
-        frame_dir = os.path.join(self.name, 'Contents', 'Frameworks')
-        for inm, fnm, typ in links:
-            if typ == 'BINARY':
-                tofnm = os.path.join(frame_dir, os.path.split(inm)[-1])
-            else:
-                tofnm = os.path.join(res_dir, inm)
-            todir = os.path.dirname(tofnm)
-            if not os.path.exists(todir):
-                os.makedirs(todir)
-            if os.path.isdir(fnm):
-                # Because shutil.copy2() is the default copy function for shutil.copytree, this will also copy file
-                # metadata.
-                shutil.copytree(fnm, tofnm)
-            else:
-                shutil.copy(fnm, tofnm)
-            base_path = os.path.split(inm)[0]
-            if base_path:
-                if not os.path.exists(os.path.join(bin_dir, inm)):
-                    path = ''
-                    for part in iter(base_path.split(os.path.sep)):
-                        # Build path from previous path and the next part of the base path
-                        path = os.path.join(path, part)
-                        try:
-                            relative_source_path = os.path.relpath(
-                                os.path.join(res_dir, path),
-                                os.path.split(os.path.join(bin_dir, path))[0]
-                            )
-                            dest_path = os.path.join(bin_dir, path)
-                            os.symlink(relative_source_path, dest_path)
-                            break
-                        except FileExistsError:
-                            pass
-                    if not os.path.exists(os.path.join(bin_dir, inm)) and not os.path.exists(os.path.join(frame_dir, os.path.split(inm)[-1])):
-                        relative_source_path = os.path.relpath(
-                            os.path.join(res_dir, inm),
-                            os.path.split(os.path.join(bin_dir, inm))[0]
-                        )
-                        dest_path = os.path.join(bin_dir, inm)
-                        os.symlink(relative_source_path, dest_path)
-            else:  # If path is empty, e.g., a top-level file, try to just symlink the file.
-                if typ == 'BINARY':
-                    os.symlink(
-                        os.path.relpath(os.path.join(frame_dir, inm),
-                                        os.path.split(os.path.join(bin_dir, inm))[0]), os.path.join(bin_dir, inm)
-                    )
-                else:
-                    os.symlink(
-                        os.path.relpath(os.path.join(res_dir, inm),
-                                        os.path.split(os.path.join(bin_dir, inm))[0]), os.path.join(bin_dir, inm)
-                    )
 
         # Sign the bundle
         logger.info('Signing the BUNDLE...')
